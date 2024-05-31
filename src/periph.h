@@ -6,19 +6,7 @@
 #ifndef PERIPH_H
 #define PERIPH_H
 
-
-////////// SONAR UTILITY FUNCTIONS ///////////
-
-void init_sonar(){
-	sei();					/* Enable global interrupt */
-	TIMSK1 = (1 << TOIE1);	/* Enable Timer1 overflow interrupts */
-	TCCR1A = 0;
-}
-
-// read_sonar function implmentation moved to timerISR.h file
-// double read_sonar()
-
-////////// ADC UTILITY FUNCTIONS ///////////
+////////// Analog-Digital Converter UTILITY FUNCTIONS ///////////
 
 void ADC_init() {
   ADMUX = (1<<REFS0);
@@ -42,7 +30,5 @@ unsigned int ADC_read(unsigned char chnl){
 
 	return ((high << 8) | low) ;
 }
-
-////////// ADC AND SONAR UTILITY FUNCTIONS ///////////
 
 #endif /* PERIPH_H */
