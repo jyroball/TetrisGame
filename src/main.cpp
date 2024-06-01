@@ -3,7 +3,10 @@
 #include "periph.h"
 #include "spiAVR.h"
 
-#define NUM_TASKS 1 //TODO: Change to the number of tasks being used
+#define NUM_TASKS 1     //Macro for total number of tasks
+
+//TOOK OUT PASSIVE BUZZER CODE FOR NOW TO TEST TETRIS BOARD
+
 
 /*
         Initialize LED Matrix
@@ -57,47 +60,157 @@ void Matrix_Init() {
   }
 }
 
+//Global Variables
+short numTiles = 0;   //How many tiles a block has traversed (can't be more than 24)
+const short columns = 8;    //num of columns in the tetris grid
+
+//  Array for Tetris Grid
+unsigned long tetrisGrid[columns] = {
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000
+};
+
+//  Array for Output Grid
+unsigned long outGrid[columns] = {
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000
+};
+
+//
+//  Arrays for different pieces
+//
+
+//Square Piece
+const short positions = 4;
+//Positions are all the same cause its a square
+unsigned long pieces[positions][columns] = {
+  //Base Position
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 2
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 3
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 4
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}
+};
+
+
+//
+//  Task Functions
+//
+
 //Task struct for concurrent synchSMs implmentations
 typedef struct _task{
-	signed 	 char state; 		//Task's current state
-	unsigned long period; 		//Task period
-	unsigned long elapsedTime; 	//Time elapsed since last task tick
-	int (*TickFct)(int); 		//Task tick function
+	signed 	 char state; 		      //Task's current state
+	unsigned long period; 		    //Task period
+	unsigned long elapsedTime; 	  //Time elapsed since last task tick
+	int (*TickFct)(int); 		      //Task tick function
 } task;
 
-
-//TODO: Define Periods for each task
-// e.g. const unsined long TASK1_PERIOD = <PERIOD>
-const unsigned long GCD_PERIOD = 10;//TODO:Set the GCD Period
-const unsigned long TASK1_PERIOD = 10;
+//Define Periods for each task
+const unsigned long GCD_PERIOD = 100;       //GCD Period for tasks
+const unsigned long TASK1_PERIOD = 100;
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
-//  Passive Buzzer (Background Music) Output
-enum task1_states {task1_start, playSong, end} task1_state;
+//  LED Matrix States
+enum task1_states {task1_start, drop, hold, off} task1_state;
 
 void TimerISR() {
-	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {                   // Iterate through each task in the task array
-		if ( tasks[i].elapsedTime == tasks[i].period ) {           // Check if the task is ready to tick
-			tasks[i].state = tasks[i].TickFct(tasks[i].state); // Tick and set the next state for this task
-			tasks[i].elapsedTime = 0;                          // Reset the elapsed time for the next tick
+	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
+		if ( tasks[i].elapsedTime == tasks[i].period ) {         // Check if the task is ready to tick
+			tasks[i].state = tasks[i].TickFct(tasks[i].state);     // Tick and set the next state for this task
+			tasks[i].elapsedTime = 0;                              // Reset the elapsed time for the next tick
 		}
-		tasks[i].elapsedTime += GCD_PERIOD;                        // Increment the elapsed time by GCD_PERIOD
+		tasks[i].elapsedTime += GCD_PERIOD;                      // Increment the elapsed time by GCD_PERIOD
 	}
 }
+
+
+/*
+// Use as template for handling the led matrix using 32 bits for each led
+unsigned long x = 0xAA08FF01; // b4 b3 b2 b1
+
+unsigned int b1 = (x & 0xff);
+unsigned int b2 = (x >> 8) & 0xff;
+unsigned int b3 = (x >> 16) & 0xff;
+unsigned int b4 = (x >> 24);
+*/
+
+unsigned long x = 0x00000000; // b4 b3 b2 b1
+
+unsigned int b1 = (x & 0xff);
+unsigned int b2 = (x >> 8) & 0xff;
+unsigned int b3 = (x >> 16) & 0xff;
+unsigned int b4 = (x >> 24);
+
+int j = 0;
 
 //LED Matrix Tick function
 int task1_tick(int state) {
     //state transitions
     switch(state) {
         case task1_start:
-          state = playSong;
+          state = drop;
           break;
-        case playSong:
-          state = end;
+        case drop:
+          j++;
+          state = drop;
+          if(j >= 28) {
+            j = 0;
+            state = hold;
+          }
           break;
-        case end:
-          state = end;
+        case hold:
+          j++;
+          state = hold;
+          if(j >= 100) {
+            j = 0;
+            state = off;
+          }
+          break;
+        case off:
+          state = drop;
           break;
     }
 
@@ -106,19 +219,51 @@ int task1_tick(int state) {
         case task1_start:
           //ignore do nothing
           break;
-        case playSong:
-          //send first instruction (location)
-          SPI_SEND(0x01);
-          //send second instruction (leds)
-          SPI_SEND(0xF0);
+        case drop:
+          //Loop through all columns to output
+          for(int i = 0; i < 8; i++) {
+            //Convert the 32bit binary to 4 8-bit binary
+            x = outGrid[i] << j;   //REMEMBER TO CHANGE TO PIECE AFTER TESTING ALSO CHANGE j TO numTiles AFTER
+            b1 = (x & 0xff);
+            b2 = (x >> 8) & 0xff;
+            b3 = (x >> 16) & 0xff;
+            b4 = (x >> 24);
+
+            //send stuff to SPI
+            PORTB = SetBit(PORTB, 2, 0); //set low
+            //matrix 4
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b4);
+            //matrix 3
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b3);
+            //matrix 2
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b2);
+            //matrix 1
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b1);
+            PORTB = SetBit(PORTB, 2, 1); //set high
+          }
           
-          //set low
-          PORTB = SetBit(PORTB, 2, 0);
-          //turn high
-          PORTB = SetBit(PORTB, 2, 1);
           break;
-        case end:
+        case hold:
           //do nothing
+          break;
+        case off:
+          for(int i = 0; i < 8; i++) {
+            PORTB = SetBit(PORTB, 2, 0); //set low
+            SPI_SEND(0x01 + j);
+            SPI_SEND(0x00);
+            SPI_SEND(0x01 + j);
+            SPI_SEND(0x00);
+            SPI_SEND(0x01 + j);
+            SPI_SEND(0x00);
+            SPI_SEND(0x01 + j);
+            SPI_SEND(0x00);
+            PORTB = SetBit(PORTB, 2, 1); //set high
+          }
+
           break;
     }
 
