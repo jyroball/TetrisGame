@@ -61,7 +61,9 @@ void Matrix_Init() {
 }
 
 //Global Variables
-short numTiles = 0;   //How many tiles a block has traversed (can't be more than 24)
+short numTiles = 0;         //How many tiles a block has traversed (can't be more than 24)
+short horPos = 0;           //Variable for horizontal position multiplier
+short verPos = 0;           //Variable for vertical position multiplier
 const short columns = 8;    //num of columns in the tetris grid
 
 //  Array for Tetris Grid
@@ -91,11 +93,13 @@ unsigned long outGrid[columns] = {
 //
 //  Arrays for different pieces
 //
+//Variables for different pieces
+short numPieces = 5;    //Total number of pieces
+const short numPos = 4; //Total Number of rotation positions
 
 //Square Piece
-const short positions = 4;
 //Positions are all the same cause its a square
-unsigned long pieces[positions][columns] = {
+unsigned long sqrPiece[numPos][columns] = {
   //Base Position
   {0x00000000, 
   0x00000000, 
@@ -186,6 +190,11 @@ unsigned int b4 = (x >> 24);
 
 int j = 0;
 
+
+//Validation functions for checking piece
+
+
+
 //LED Matrix Tick function
 int task1_tick(int state) {
     //state transitions
@@ -194,18 +203,22 @@ int task1_tick(int state) {
           state = drop;
           break;
         case drop:
-          j++;
+          numTiles++;
           state = drop;
-          if(j >= 28) {
-            j = 0;
+
+
+
+          //Case for when its at the very last tile
+          if(numTiles >= 28) {
+            numTiles = 0;
             state = hold;
           }
           break;
         case hold:
-          j++;
+          numTiles++;
           state = hold;
-          if(j >= 100) {
-            j = 0;
+          if(numTiles >= 100) {
+            numTiles = 0;
             state = off;
           }
           break;
@@ -223,7 +236,7 @@ int task1_tick(int state) {
           //Loop through all columns to output
           for(int i = 0; i < 8; i++) {
             //Convert the 32bit binary to 4 8-bit binary
-            x = outGrid[i] << j;   //REMEMBER TO CHANGE TO PIECE AFTER TESTING ALSO CHANGE j TO numTiles AFTER
+            x = outGrid[(i + 8) % 8] << numTiles;   //i + 8 to control where we want to move piecves horizontally
             b1 = (x & 0xff);
             b2 = (x >> 8) & 0xff;
             b3 = (x >> 16) & 0xff;
@@ -253,13 +266,13 @@ int task1_tick(int state) {
         case off:
           for(int i = 0; i < 8; i++) {
             PORTB = SetBit(PORTB, 2, 0); //set low
-            SPI_SEND(0x01 + j);
+            SPI_SEND(0x01 + i);
             SPI_SEND(0x00);
-            SPI_SEND(0x01 + j);
+            SPI_SEND(0x01 + i);
             SPI_SEND(0x00);
-            SPI_SEND(0x01 + j);
+            SPI_SEND(0x01 + i);
             SPI_SEND(0x00);
-            SPI_SEND(0x01 + j);
+            SPI_SEND(0x01 + i);
             SPI_SEND(0x00);
             PORTB = SetBit(PORTB, 2, 1); //set high
           }
