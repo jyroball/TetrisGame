@@ -1,4 +1,7 @@
 //queeueu class implemented to know what next pieces should be placed
+
+//REWRITE TO ACCOMODATE FOR DIFFERENT PIECES :)
+
 class queue {
     private:
         const int maxSize = 4;

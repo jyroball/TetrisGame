@@ -2,11 +2,11 @@
 #include "helper.h"
 #include "periph.h"
 #include "spiAVR.h"
+#include "queue.h"
 
 #define NUM_TASKS 1     //Macro for total number of tasks
 
 //TOOK OUT PASSIVE BUZZER CODE FOR NOW TO TEST TETRIS BOARD
-
 
 /*
         Initialize LED Matrix
@@ -62,7 +62,7 @@ void Matrix_Init() {
 
 //Global Variables
 short numTiles = 0;         //How many tiles a block has traversed (can't be more than 24)
-short horPos = 0;           //Variable for horizontal position multiplier
+short horPos = 8;           //Variable for horizontal position multiplier (-1 is right and + 1 is left)
 short verPos = 0;           //Variable for vertical position multiplier
 const short columns = 8;    //num of columns in the tetris grid
 
@@ -140,6 +140,78 @@ unsigned long sqrPiece[numPos][columns] = {
 
 
 //
+//  Next Piecves queue and utility functions
+//
+
+
+//REWRITE QUEUE TO HAVE THE PIECES AND THEIR POSITIONS SO JUST HANDLE THESE
+
+
+queue nextPCS;
+
+//Initialize queue
+void queue_init() {
+  //Push first 4 shapes for now
+  nextPCS.push(0);
+  nextPCS.push(1);
+  nextPCS.push(2);
+  nextPCS.push(3);
+}
+
+void next() {
+  nextPCS.pop();
+  //push a new piece to the queue somwhat randomly
+  nextPCS.push(((nextPCS.first() + 3) * 3 + 3) % 5);
+}
+
+
+
+//
+//  Functions for piece placement validations
+//
+
+//Normal droping validation
+bool checkDrop() {
+
+
+
+}
+
+//Horizontal movement validation
+bool checkSide() {
+
+}
+
+//rotating validation (rot + rotMul) % numRot then keep changing rotMul
+bool checkRotate() {
+
+}
+
+
+
+//
+//  Output Grid and Tetris Grid Update functions
+//
+
+//Call after having all checks done
+void updateOutput() {
+  //loop through all of columns and place pieces into it
+  for(int i = 0; i < 8; i++) {
+    outGrid[i] = tetrisGrid[i] | (sqrPiece[0][(i + horPos) % 8] << (numTiles + verPos));  //Change square piece position with changes in vertical and horizontal position
+  }
+}
+
+//Update actual tetris board to keep track of settled pieces
+void updateTetris() {
+  //loop through all of columns and place pieces into it
+  for(int i = 0; i < 8; i++) {
+    tetrisGrid[i] = outGrid[i];
+  }
+}
+
+
+
+//
 //  Task Functions
 //
 
@@ -152,8 +224,8 @@ typedef struct _task{
 } task;
 
 //Define Periods for each task
-const unsigned long GCD_PERIOD = 100;       //GCD Period for tasks
-const unsigned long TASK1_PERIOD = 100;
+const unsigned long GCD_PERIOD = 50;       //GCD Period for tasks
+const unsigned long TASK1_PERIOD = 250;
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
@@ -170,6 +242,10 @@ void TimerISR() {
 	}
 }
 
+
+//
+//  LED Matrix Tick Function
+//
 
 /*
 // Use as template for handling the led matrix using 32 bits for each led
@@ -201,15 +277,34 @@ int task1_tick(int state) {
     switch(state) {
         case task1_start:
           state = drop;
+          //initialize output grid
+          updateOutput();
           break;
         case drop:
+          
+          //Have checks too know if stay on this state or next
+
+          //REMMEVBER TO DO THIS AND MAYVBE DRAW IT OUT FIRST
+
+          
+          
+
+          //Increment after checking drops and everything
           numTiles++;
           state = drop;
-
-
+          
+          //update output grid
+          updateOutput();
 
           //Case for when its at the very last tile
           if(numTiles >= 28) {
+
+            //TEMPORARY SOLUITION
+
+            numTiles--;
+            //update output grid
+            updateOutput();
+
             numTiles = 0;
             state = hold;
           }
@@ -217,7 +312,13 @@ int task1_tick(int state) {
         case hold:
           numTiles++;
           state = hold;
-          if(numTiles >= 100) {
+
+          //wait for now i guess
+
+          if(numTiles >= 20) {
+            //Change tetris board with new pieces
+            updateTetris();
+
             numTiles = 0;
             state = off;
           }
@@ -236,7 +337,7 @@ int task1_tick(int state) {
           //Loop through all columns to output
           for(int i = 0; i < 8; i++) {
             //Convert the 32bit binary to 4 8-bit binary
-            x = outGrid[(i + 8) % 8] << numTiles;   //i + 8 to control where we want to move piecves horizontally
+            x = outGrid[i];   //i + 8 to control where we want to move piecves horizontally
             b1 = (x & 0xff);
             b2 = (x >> 8) & 0xff;
             b3 = (x >> 16) & 0xff;
@@ -283,6 +384,12 @@ int task1_tick(int state) {
     //return satte
     return state;
 }
+
+
+
+//
+//  Main Function
+//
 
 int main(void) {
     //TODO: initialize all your inputs and ouputs
