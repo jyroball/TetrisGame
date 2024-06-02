@@ -83,8 +83,8 @@ unsigned long outGrid[columns] = {
   0x00000000, 
   0x00000000, 
   0x00000000, 
-  0x00000018, 
-  0x00000018, 
+  0x00000000, 
+  0x00000000, 
   0x00000000, 
   0x00000000, 
   0x00000000
@@ -138,6 +138,170 @@ unsigned long sqrPiece[numPos][columns] = {
   0x00000000}
 };
 
+//T Piece
+//Positions are rotating clockwise
+unsigned long tPiece[numPos][columns] = {
+  //Base Position (Up T)
+  {0x00000000, 
+  0x00000000, 
+  0x00000010, 
+  0x00000018, 
+  0x00000010, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 2 (right T)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000008, 
+  0x0000001C, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 3 (down T)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000001C, 
+  0x00000008, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 4 (left T)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000008, 
+  0x00000018, 
+  0x00000008, 
+  0x00000000, 
+  0x00000000}
+};
+
+//| Piece
+//Positions are rotating clockwise
+unsigned long lPiece[numPos][columns] = {
+  //Base Position (UP)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000001E, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 2 (RIGHT)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000010, 
+  0x00000010, 
+  0x00000010, 
+  0x00000010, 
+  0x00000000}, 
+  //Position 3 (DOWN)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000001E, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 4 (LEFT)
+  {0x00000000, 
+  0x00000010, 
+  0x00000010, 
+  0x00000010, 
+  0x00000010, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}
+};
+
+//L Piece
+//Positions are rotating clockwise
+unsigned long LPiece[numPos][columns] = {
+  //Base Position (UP)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000001C, 
+  0x00000010, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 2 (RIGHT)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000018, 
+  0x00000008, 
+  0x00000008, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 3 (DOWN)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000002, 
+  0x0000001C, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 4 (LEFT)
+  {0x00000000, 
+  0x00000000, 
+  0x00000010, 
+  0x00000010, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}
+};
+
+//z Piece
+//Positions are rotating clockwise
+unsigned long zPiece[numPos][columns] = {
+  //Base Position (UP)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000000C, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 2 (RIGHT)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x00000010, 
+  0x00000018, 
+  0x00000008, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 3 (DOWN)
+  {0x00000000, 
+  0x00000000, 
+  0x00000000, 
+  0x0000000C, 
+  0x00000018, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}, 
+  //Position 4 (LEFT)
+  {0x00000000, 
+  0x00000000, 
+  0x00000010, 
+  0x00000018, 
+  0x00000008, 
+  0x00000000, 
+  0x00000000, 
+  0x00000000}
+};
+
 
 //
 //  Next Piecves queue and utility functions
@@ -145,7 +309,6 @@ unsigned long sqrPiece[numPos][columns] = {
 
 
 //REWRITE QUEUE TO HAVE THE PIECES AND THEIR POSITIONS SO JUST HANDLE THESE
-
 
 queue nextPCS;
 
@@ -187,8 +350,6 @@ bool checkRotate() {
 
 }
 
-
-
 //
 //  Output Grid and Tetris Grid Update functions
 //
@@ -197,7 +358,7 @@ bool checkRotate() {
 void updateOutput() {
   //loop through all of columns and place pieces into it
   for(int i = 0; i < 8; i++) {
-    outGrid[i] = tetrisGrid[i] | (sqrPiece[0][(i + horPos) % 8] << (numTiles + verPos));  //Change square piece position with changes in vertical and horizontal position
+    outGrid[i] = tetrisGrid[i] | (zPiece[2][(i + horPos) % 8] << (numTiles + verPos));  //Change square piece position with changes in vertical and horizontal position
   }
 }
 
@@ -224,7 +385,7 @@ typedef struct _task{
 } task;
 
 //Define Periods for each task
-const unsigned long GCD_PERIOD = 50;       //GCD Period for tasks
+const unsigned long GCD_PERIOD = 250;       //GCD Period for tasks
 const unsigned long TASK1_PERIOD = 250;
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
@@ -399,6 +560,7 @@ int main(void) {
     SPI_INIT();     // Initialize SPI protocol
     Matrix_Init();  // Initialize 8x8 Led matrix
 
+    
     //Task Initialization
     //LED Matrix task initialization
     tasks[0].period = TASK1_PERIOD;
@@ -416,6 +578,7 @@ int main(void) {
         TimerFlag = 0;        // Lower flag
 
     }
+
     return 0;
 
 }

@@ -5,6 +5,9 @@
 class queue {
     private:
         const int maxSize = 4;
+
+        //have an array for the piece and an array for what type of piece it is
+
         int nextPcs[4];
         int front;          //Variable to know what index is front
         int size;           //variable to know how many numbers there are in the array
