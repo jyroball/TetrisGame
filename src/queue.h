@@ -8,6 +8,9 @@ class queue {
 
         //have an array for the piece and an array for what type of piece it is
 
+        //Have parameters for a piece's max range for horizontal values here to might as well
+        // make a function that calculates that per piece and its type of rotation
+
         int nextPcs[4];
         int front;          //Variable to know what index is front
         int size;           //variable to know how many numbers there are in the array
