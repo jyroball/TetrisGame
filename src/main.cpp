@@ -3,6 +3,7 @@
 #include "periph.h"
 #include "spiAVR.h"
 #include "queue.h"
+#include "serialATmega.h"
 
 #define NUM_TASKS 2     //Macro for total number of tasks
 
@@ -537,7 +538,7 @@ typedef struct _task{
 } task;
 
 //Define Periods for each task
-const unsigned long GCD_PERIOD = 250;       //GCD Period for tasks
+const unsigned long GCD_PERIOD = 50;       //GCD Period for tasks
 const unsigned long TASK1_PERIOD = 250;     //LED Matrix
 const unsigned long TASK2_PERIOD = 50;     //JoyStick
 
@@ -551,9 +552,6 @@ enum task2_states {task2_start, idle, left, right, hold} task2_state;
 int varX;
 
 void TimerISR() {
-  //Read input
-  varX = ADC_read(1);
-
 	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
 		if ( tasks[i].elapsedTime == tasks[i].period ) {         // Check if the task is ready to tick
 			tasks[i].state = tasks[i].TickFct(tasks[i].state);     // Tick and set the next state for this task
@@ -638,7 +636,7 @@ int task1_tick(int state) {
         case off:
           state = drop;
           //reset hor position and rotation
-          //horPos = 8;
+          horPos = 8;
           rot = 0;
 
           next();
@@ -744,6 +742,7 @@ int task2_tick(int state) {
           state = hold;
           break;
         case hold:
+          //stay in hold while holdinhg
           if(((PINC>>3) & 0x01) || ((PINC>>4) & 0x01)) {
             state = hold;
           }
@@ -763,12 +762,10 @@ int task2_tick(int state) {
           //do nothingh
           break;
         case left:
-          next();
-          setPiece();
+          if(horPos < maxHorLeft) horPos++;
           break;
         case right:
-          next();
-          setPiece();
+          if(horPos > maxHorRight) horPos--;
           break;
         case hold:
           //do nothjing
@@ -795,6 +792,7 @@ int main(void) {
     Matrix_Init();  // Initialize 8x8 Led matrix
     queue_init();   // Initialize queue with first 4 pieces
     setPiece();     // Set First piece 
+    serial_init (9600);
 
     
     //Task Initialization
