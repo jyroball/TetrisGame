@@ -4,7 +4,10 @@
 #include "spiAVR.h"
 #include "queue.h"
 
-#define NUM_TASKS 1     //Macro for total number of tasks
+#define NUM_TASKS 2     //Macro for total number of tasks
+
+//Variable for pseudo random number
+int randomNum = 0;
 
 //TOOK OUT PASSIVE BUZZER CODE FOR NOW TO TEST TETRIS BOARD
 
@@ -302,20 +305,32 @@ unsigned long zPiece[numPos][columns] = {
   0x00000000}
 };
 
-
 //
 //  Next Piecves queue and utility functions
 //
-
-
-//REWRITE QUEUE TO HAVE THE PIECES AND THEIR POSITIONS SO JUST HANDLE THESE
-
 queue nextPCS;
+
+//  Array for Next Piece
+unsigned long NextPiece[columns] = {
+    0x00000000, 
+    0x00000000, 
+    0x00000000, 
+    0x00000000, 
+    0x00000000, 
+    0x00000000, 
+    0x00000000, 
+    0x00000000
+};
+
+//Have parameters for a piece's max range for horizontal values here to might as well
+int maxHorLeft = 0;
+int maxHorRight = 0;
+int rot = 0;
 
 //Initialize queue
 void queue_init() {
   //Push first 4 shapes for now
-  nextPCS.push(0);
+  nextPCS.push(4);
   nextPCS.push(1);
   nextPCS.push(2);
   nextPCS.push(3);
@@ -323,11 +338,59 @@ void queue_init() {
 
 void next() {
   nextPCS.pop();
+  //set RandomNum to new number
+  randomNum = randomNum * 3;
   //push a new piece to the queue somwhat randomly
-  nextPCS.push(((nextPCS.first() + 3) * 3 + 3) % 5);
+  nextPCS.push(randomNum % 5);
 }
 
-
+void setPiece() {
+    //Know what piece the Next piece is gonna be
+    switch(nextPCS.first()) {
+        // Square Piece
+        case 0:
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = sqrPiece[rot][i];
+            }
+            break;
+        // T Piece
+        case 1:
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = tPiece[rot][i];
+            }
+            break;
+        // | Piece
+        case 2:
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = lPiece[rot][i];
+            }
+            break;
+        //L Piece
+        case 3:
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = LPiece[rot][i];
+            }
+            break;
+        // z Piece
+        case 4:
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = zPiece[rot][i];
+            }
+            break;
+        default:
+            //have L piece as default for now
+            //loop through all of columns and place pieces into it
+            for(int i = 0; i < 8; i++) {
+                NextPiece[i] = LPiece[rot][i];
+            }
+            break;
+    }
+}
 
 //
 //  Functions for piece placement validations
@@ -335,9 +398,15 @@ void next() {
 
 //Normal droping validation
 bool checkDrop() {
-
-
-
+  //See if the dropping piece is in collision
+  //Loop through all columns to output
+  for(int i = 0; i < 8; i++) {
+    //if output and tetrius frid have a colliusion or if bit mask does not equal 0
+    if((NextPiece[(i + horPos) % 8] << (numTiles + verPos) & tetrisGrid[i]) != 0x00000000) {
+      return false; //has a collision
+    }
+  }
+  return true;  //No colliusion
 }
 
 //Horizontal movement validation
@@ -358,7 +427,7 @@ bool checkRotate() {
 void updateOutput() {
   //loop through all of columns and place pieces into it
   for(int i = 0; i < 8; i++) {
-    outGrid[i] = tetrisGrid[i] | (zPiece[2][(i + horPos) % 8] << (numTiles + verPos));  //Change square piece position with changes in vertical and horizontal position
+    outGrid[i] = tetrisGrid[i] | (NextPiece[(i + horPos) % 8] << (numTiles + verPos));  //Change square piece position with changes in vertical and horizontal position
   }
 }
 
@@ -386,12 +455,16 @@ typedef struct _task{
 
 //Define Periods for each task
 const unsigned long GCD_PERIOD = 250;       //GCD Period for tasks
-const unsigned long TASK1_PERIOD = 250;
+const unsigned long TASK1_PERIOD = 250;     //LED Matrix
+const unsigned long TASK2_PERIOD = 250;     //JoyStick
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
 //  LED Matrix States
-enum task1_states {task1_start, drop, hold, off} task1_state;
+enum task1_states {task1_start, drop, checkTetris, off} task1_state;
+//  Joystick Left and Right State
+enum task2_states {task2_start, idle, left, right, hold} task2_state;
+
 
 void TimerISR() {
 	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
@@ -400,6 +473,7 @@ void TimerISR() {
 			tasks[i].elapsedTime = 0;                              // Reset the elapsed time for the next tick
 		}
 		tasks[i].elapsedTime += GCD_PERIOD;                      // Increment the elapsed time by GCD_PERIOD
+    randomNum++;  //INcrement random number
 	}
 }
 
@@ -408,29 +482,13 @@ void TimerISR() {
 //  LED Matrix Tick Function
 //
 
-/*
-// Use as template for handling the led matrix using 32 bits for each led
-unsigned long x = 0xAA08FF01; // b4 b3 b2 b1
-
-unsigned int b1 = (x & 0xff);
-unsigned int b2 = (x >> 8) & 0xff;
-unsigned int b3 = (x >> 16) & 0xff;
-unsigned int b4 = (x >> 24);
-*/
-
+//  Pipeline for LED matrix for each matrix
 unsigned long x = 0x00000000; // b4 b3 b2 b1
 
 unsigned int b1 = (x & 0xff);
 unsigned int b2 = (x >> 8) & 0xff;
 unsigned int b3 = (x >> 16) & 0xff;
 unsigned int b4 = (x >> 24);
-
-int j = 0;
-
-
-//Validation functions for checking piece
-
-
 
 //LED Matrix Tick function
 int task1_tick(int state) {
@@ -442,40 +500,46 @@ int task1_tick(int state) {
           updateOutput();
           break;
         case drop:
-          
-          //Have checks too know if stay on this state or next
-
-          //REMMEVBER TO DO THIS AND MAYVBE DRAW IT OUT FIRST
-
-          
-          
-
-          //Increment after checking drops and everything
+          // Initially Increment after checking drops and everything
           numTiles++;
           state = drop;
           
           //update output grid
           updateOutput();
 
+
+          //have rotation check and fast drop with joystick here
+
+
+          
+          //Collsiuon check
+          if(!checkDrop()) {
+            //Re update output grid to old one
+              numTiles--;
+              //update output grid
+              updateOutput();
+              //New state
+              numTiles = 0;
+              state = checkTetris;
+          }
+
           //Case for when its at the very last tile
           if(numTiles >= 28) {
-
-            //TEMPORARY SOLUITION
-
+            //change output to old one
             numTiles--;
             //update output grid
             updateOutput();
-
+            //New state
             numTiles = 0;
-            state = hold;
+            state = checkTetris;
           }
           break;
-        case hold:
+        case checkTetris:
           numTiles++;
-          state = hold;
+          state = checkTetris;
 
-          //wait for now i guess
-
+          
+          //Update Tetris
           if(numTiles >= 20) {
             //Change tetris board with new pieces
             updateTetris();
@@ -483,9 +547,17 @@ int task1_tick(int state) {
             numTiles = 0;
             state = off;
           }
+
           break;
         case off:
           state = drop;
+          //reset hor position and rotation
+          horPos = 8;
+          rot = 0;
+
+          next();
+          setPiece();
+
           break;
     }
 
@@ -522,8 +594,14 @@ int task1_tick(int state) {
           }
           
           break;
-        case hold:
-          //do nothing
+        case checkTetris:
+          //do nothing For now
+          
+          //Have a check if they get tetris or get a row
+            //loop through all of Tetris or output grid
+            //then outgrid[i] & 0x00000001 == 0x00000001 for one row then check again and keep looping till not there
+
+
           break;
         case off:
           for(int i = 0; i < 8; i++) {
@@ -546,6 +624,40 @@ int task1_tick(int state) {
     return state;
 }
 
+//
+//  Joytstick Left and Right Tick Function
+//
+
+int task1_tick(int state) {
+    //state transitions
+    switch(state) {
+        case task2_start:
+          // Do nothing
+          break;
+        case drop:
+          break;
+        case checkTetris:
+          break;
+        case off:
+          break;
+    }
+
+    //state functions
+    switch(state) {
+        case task2_start:
+          //ignore do nothing
+          break;
+        case drop:
+          break;
+        case checkTetris:
+          break;
+        case off:
+          break;
+    }
+
+    //return satte
+    return state;
+}
 
 
 //
@@ -559,6 +671,8 @@ int main(void) {
     ADC_init();     // initializes ADC
     SPI_INIT();     // Initialize SPI protocol
     Matrix_Init();  // Initialize 8x8 Led matrix
+    queue_init();   // Initialize queue with first 4 pieces
+    setPiece();     // Set First piece 
 
     
     //Task Initialization
