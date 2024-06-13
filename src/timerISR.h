@@ -25,8 +25,8 @@ void TimerSet(unsigned long M) {
 
 void TimerOn() {
 	// AVR timer/counter controller register TCCR1
-	TCCR2A = 0x00;
-  TCCR2B 	= 0x0B;	// bit3 = 1: CTC mode (clear timer on compare)
+	TCCR2A = 0x02;
+    TCCR2B 	= 0x04;	// bit3 = 1: CTC mode (clear timer on compare)
 					// bit2bit1bit0=011: prescaler /64
 					// 00001011: 0x0B
 					// SO, 16 MHz clock or 16,000,000 /64 = 250,000 ticks/s
@@ -79,40 +79,6 @@ ISR(TIMER2_COMPA_vect)
 		_avr_timer_cntcurr = _avr_timer_M;
 	}
 
-}
-
-int TimerOverflow = 0;
-
-ISR(TIMER1_OVF_vect)
-{
-	TimerOverflow++;	/* Increment Timer Overflow count */
-}
-
-
-double read_sonar(){
-    long count;
-    // PORTC = SetBit(PORTC,2,1); 0000_0100 //0x02
-    PORTC |= 0x04;
-    _delay_us(10);
-    // PORTC = SetBit(PORTC,2,0); // 1111_1011
-    PORTC &= ~0x04;
-
-    TCNT1 = 0;	/* Clear Timer counter */
-		TCCR1B = 0x41;	/* Capture on rising edge, No prescaler*/
-		TIFR1 = 1<<ICF1;	/* Clear ICP flag (Input Capture flag) */
-		TIFR1 = 1<<TOV1;	/* Clear Timer Overflow flag */
-
-		/*Calculate width of Echo by Input Capture (ICP) */
-		while ((TIFR1 & (1 << ICF1)) == 0);/* Wait for rising edge */
-		TCNT1 = 0;	/* Clear Timer counter */
-		TCCR1B = 0x01;	/* Capture on falling edge, No prescaler */
-		TIFR1 = 1<<ICF1;	/* Clear ICP flag (Input Capture flag) */
-		TIFR1 = 1<<TOV1;	/* Clear Timer Overflow flag */
-		TimerOverflow = 0;  /* Clear Timer overflow count */
-		while ((TIFR1 & (1 << ICF1)) == 0);/* Wait for falling edge */
-		count = ICR1 + (65535 * TimerOverflow);	/* Take count */
-		
-		return((double)count / 932.46);
 }
 
 

@@ -324,7 +324,7 @@ unsigned long NextPiece[columns] = {
 
 //Have parameters for a piece's max range for horizontal values here to might as well
 int maxHorLeft = 0;
-int maxHorRight = 0;
+int maxHorRight = 7;
 int rot = 0;
 
 //Initialize queue
@@ -353,12 +353,32 @@ void setPiece() {
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = sqrPiece[rot][i];
             }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            maxHorLeft = 11;
+            maxHorRight = 5;
             break;
         // T Piece
         case 1:
             //loop through all of columns and place pieces into it
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = tPiece[rot][i];
+            }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            if(rot == 0) {
+              maxHorLeft = 10;
+              maxHorRight = 5;
+            }
+            if(rot == 1) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 2) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 3) {
+              maxHorLeft = 11;
+              maxHorRight = 6;
             }
             break;
         // | Piece
@@ -367,12 +387,46 @@ void setPiece() {
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = lPiece[rot][i];
             }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            if(rot == 0) {
+              maxHorLeft = 12;
+              maxHorRight = 5;
+            }
+            if(rot == 1) {
+              maxHorLeft = 11;
+              maxHorRight = 7;
+            }
+            if(rot == 2) {
+              maxHorLeft = 11;
+              maxHorRight = 4;
+            }
+            if(rot == 3) {
+              maxHorLeft = 9;
+              maxHorRight = 5;
+            }
             break;
         //L Piece
         case 3:
             //loop through all of columns and place pieces into it
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = LPiece[rot][i];
+            }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            if(rot == 0) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 1) {
+              maxHorLeft = 11;
+              maxHorRight = 6;
+            }
+            if(rot == 2) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 3) {
+              maxHorLeft = 10;
+              maxHorRight = 5;
             }
             break;
         // z Piece
@@ -381,12 +435,46 @@ void setPiece() {
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = zPiece[rot][i];
             }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            if(rot == 0) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 1) {
+              maxHorLeft = 11;
+              maxHorRight = 6;
+            }
+            if(rot == 2) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 3) {
+              maxHorLeft = 10;
+              maxHorRight = 5;
+            }
             break;
         default:
             //have L piece as default for now
             //loop through all of columns and place pieces into it
             for(int i = 0; i < 8; i++) {
                 NextPiece[i] = LPiece[rot][i];
+            }
+            //set max horizontals for square piece (Make sure its <= or >= when checking)
+            if(rot == 0) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 1) {
+              maxHorLeft = 11;
+              maxHorRight = 6;
+            }
+            if(rot == 2) {
+              maxHorLeft = 11;
+              maxHorRight = 5;
+            }
+            if(rot == 3) {
+              maxHorLeft = 10;
+              maxHorRight = 5;
             }
             break;
     }
@@ -407,11 +495,6 @@ bool checkDrop() {
     }
   }
   return true;  //No colliusion
-}
-
-//Horizontal movement validation
-bool checkSide() {
-
 }
 
 //rotating validation (rot + rotMul) % numRot then keep changing rotMul
@@ -456,7 +539,7 @@ typedef struct _task{
 //Define Periods for each task
 const unsigned long GCD_PERIOD = 250;       //GCD Period for tasks
 const unsigned long TASK1_PERIOD = 250;     //LED Matrix
-const unsigned long TASK2_PERIOD = 250;     //JoyStick
+const unsigned long TASK2_PERIOD = 50;     //JoyStick
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
@@ -465,8 +548,12 @@ enum task1_states {task1_start, drop, checkTetris, off} task1_state;
 //  Joystick Left and Right State
 enum task2_states {task2_start, idle, left, right, hold} task2_state;
 
+int varX;
 
 void TimerISR() {
+  //Read input
+  varX = ADC_read(1);
+
 	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
 		if ( tasks[i].elapsedTime == tasks[i].period ) {         // Check if the task is ready to tick
 			tasks[i].state = tasks[i].TickFct(tasks[i].state);     // Tick and set the next state for this task
@@ -511,7 +598,6 @@ int task1_tick(int state) {
           //have rotation check and fast drop with joystick here
 
 
-          
           //Collsiuon check
           if(!checkDrop()) {
             //Re update output grid to old one
@@ -552,7 +638,7 @@ int task1_tick(int state) {
         case off:
           state = drop;
           //reset hor position and rotation
-          horPos = 8;
+          //horPos = 8;
           rot = 0;
 
           next();
@@ -625,20 +711,46 @@ int task1_tick(int state) {
 }
 
 //
-//  Joytstick Left and Right Tick Function
+// Left and Right Tick Function
 //
-
-int task1_tick(int state) {
+int task2_tick(int state) {
     //state transitions
     switch(state) {
         case task2_start:
-          // Do nothing
+          state = idle;
           break;
-        case drop:
+        case idle:
+          //stay off if no input is done
+            if(!((PINC>>3) & 0x01) && !((PINC>>4) & 0x01)) {
+                state = idle;
+            }
+            //left button is turned on but reight not
+            else if(((PINC>>3) & 0x01)) {
+                state = left;
+            }
+            //right button is turned on but left not
+            else if(((PINC>>4) & 0x01)) {
+                state = right;
+            }
+            //stay in off just in case
+            else {
+                state = idle;
+            }
           break;
-        case checkTetris:
+        case left:
+          state = hold;
           break;
-        case off:
+        case right:
+          state = hold;
+          break;
+        case hold:
+          if(((PINC>>3) & 0x01) || ((PINC>>4) & 0x01)) {
+            state = hold;
+          }
+          //go back to off when not pressing anymore
+          else {
+            state = idle;
+          }
           break;
     }
 
@@ -647,11 +759,19 @@ int task1_tick(int state) {
         case task2_start:
           //ignore do nothing
           break;
-        case drop:
+        case idle:
+          //do nothingh
           break;
-        case checkTetris:
+        case left:
+          next();
+          setPiece();
           break;
-        case off:
+        case right:
+          next();
+          setPiece();
+          break;
+        case hold:
+          //do nothjing
           break;
     }
 
@@ -666,7 +786,9 @@ int task1_tick(int state) {
 
 int main(void) {
     //TODO: initialize all your inputs and ouputs
+    DDRC = 0x00; PORTC = 0xFF; //all inputs for C
     DDRB = 0xFF; PORTB = 0x00; //all outputs for B
+    //DDRD = 0xFF; PORTD = 0x00; //all outputs for D
 
     ADC_init();     // initializes ADC
     SPI_INIT();     // Initialize SPI protocol
@@ -681,6 +803,12 @@ int main(void) {
     tasks[0].state = task1_start;
     tasks[0].elapsedTime = TASK1_PERIOD;
     tasks[0].TickFct = &task1_tick;
+
+    //Joystick left and right task initialization
+    tasks[1].period = TASK2_PERIOD;
+    tasks[1].state = task2_start;
+    tasks[1].elapsedTime = TASK2_PERIOD;
+    tasks[1].TickFct = &task2_tick;
 
     TimerSet(GCD_PERIOD);
     TimerOn();
