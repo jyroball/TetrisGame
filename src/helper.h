@@ -39,13 +39,4 @@ void outNum(int num){
   	PORTB = SetBit(PORTB, 1 ,nums[num]&0x01);
 }
 
-
-//aFirst/Second: First range of values
-//bFirst/Second: Range of values to map to
-//inVal: value being mapped
-unsigned int map_value(unsigned int aFirst, unsigned int aSecond, unsigned int bFirst, unsigned int bSecond, unsigned int inVal)
-{
-	return bFirst + (long((inVal - aFirst))*long((bSecond-bFirst)))/(aSecond - aFirst);
-}
-
 #endif /* HEPLER_H */

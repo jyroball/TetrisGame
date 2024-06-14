@@ -1,22 +1,91 @@
-#include "timerISR.h"
-#include "helper.h"
-#include "periph.h"
-#include "spiAVR.h"
-#include "queue.h"
-#include "serialATmega.h"
+/*        Your Name & E-mail: Jyro Jimnez, jjime180@ucr.edu
 
-#define NUM_TASKS 2     //Macro for total number of tasks
+*         Discussion Section: 21
+
+*         Assignment: Custom Lab project Final Iteration
+
+*         Exercise Description: Simple Tetris Game using an 8x8 LED matrix
+
+*        
+
+*         I acknowledge all content contained herein, excluding template or example code, is my own original work.
+
+*
+
+*         Demo Link: <URL>
+
+*/
+
+//Utility Libraries
+#include "timerISR.h"     //Timer ISR
+#include "helper.h"       //For Bit access functions
+#include "periph.h"       //For ADC Utility Function
+#include "spiAVR.h"       //For SPI Communication with 8x8 LED Matrix
+#include "queue.h"        //For Queue implementation for Tetris Block organization
+#include "LCD.h"          //LCD helper Library for output
+//Library for random
+#include "stdlib.h"
+
+#define NUM_TASKS 3     //Macro for total number of tasks
+
+
+/*
+        Variables to handle score in LCD screen
+*/
+
+//Variable for Score
+int score = 0;
+char scoreOut[4] = {' ', ' ', ' ', '0'};
+
+//Score Util Function
+//function to translate int value to a string
+void convertInt(int num, char scoreOut[]) {
+  //temp int value to read
+  int x = 0;
+  //multiply by 10 initialy to work with loop
+  num *= 10;
+  for(int i = 0; i < 3; i++) {
+    //divide by 10 to get number places
+    num /= 10;
+    //mod 10 to isolate number place
+    x = num % 10;
+    //for last number
+    if(i == 2 && x >= 1) {
+        scoreOut[0] = '0' + x;
+    }
+    //for secnd dnumber
+    if(i == 1 && x >= 1) {
+        scoreOut[1] = '0' + x;
+    }
+    //for first number
+    if(i == 0) {
+        scoreOut[2] = '0' + x;
+    }
+  }
+}
+
+
+/*
+        Global Variables to haandle game logic
+*/
 
 //Variable for pseudo random number
 int randomNum = 0;
 
-//Variable for Score
-int score = 0;
-
 //bool variables to know if game over or not
 bool gameOver = 0;
 
-//TOOK OUT PASSIVE BUZZER CODE FOR NOW TO TEST TETRIS BOARD
+//Counter Variable
+int j = 0;
+
+/*
+        Passive Buzzer Functions and whatnot
+*/
+
+
+
+
+
 
 /*
         Initialize LED Matrix
@@ -70,6 +139,26 @@ void Matrix_Init() {
   }
 }
 
+
+/*
+        Array for Game Over
+*/
+
+unsigned long over[8] = {
+  0x00000000, 
+  0x7E001E00, 
+  0x127E207E, 
+  0x124A4042, 
+  0x124A4042, 
+  0x124A207E, 
+  0x6C001E00, 
+  0x00000000
+};
+
+/*
+        Tetris Grid Arrays and Variables
+*/
+
 //Global Variables
 short numTiles = 0;         //How many tiles a block has traversed (can't be more than 24)
 short horPos = 8;           //Variable for horizontal position multiplier (-1 is right and + 1 is left)
@@ -100,9 +189,11 @@ unsigned long outGrid[columns] = {
   0x00000000
 };
 
+
 //
 //  Arrays for different pieces
 //
+
 //Variables for different pieces
 short numPieces = 5;    //Total number of pieces
 const short numPos = 4; //Total Number of rotation positions
@@ -312,6 +403,7 @@ unsigned long zPiece[numPos][columns] = {
   0x00000000}
 };
 
+
 //
 //  Next Piecves queue and utility functions
 //
@@ -337,20 +429,26 @@ int rot = 0;
 //Initialize queue
 void queue_init() {
   //Push first 4 shapes for now
-  nextPCS.push(3);
-  nextPCS.push(4);
-  nextPCS.push(2);
-  nextPCS.push(0);
+  randomNum = rand();
+  nextPCS.push(randomNum % 5);
+  randomNum = rand();
+  nextPCS.push(randomNum  % 5);
+  randomNum = rand();
+  nextPCS.push(randomNum  % 5);
+  randomNum = rand();
+  nextPCS.push(randomNum  % 5);
 }
 
+//Get the next piece after using one up
 void next() {
   nextPCS.pop();
   //set RandomNum to new number
-  randomNum = randomNum * 3;
+  randomNum = rand();
   //push a new piece to the queue somwhat randomly
   nextPCS.push(randomNum % 5);
 }
 
+//Setting what the next piece is with its parameters
 void setPiece() {
     //Know what piece the Next piece is gonna be
     switch(nextPCS.first()) {
@@ -557,8 +655,9 @@ typedef struct _task{
 
 //Define Periods for each task
 const unsigned long GCD_PERIOD = 50;       //GCD Period for tasks
-const unsigned long TASK1_PERIOD = 250;     //LED Matrix
-const unsigned long TASK2_PERIOD = 50;     //JoyStick
+const unsigned long TASK1_PERIOD = 250;    //LED Matrix
+const unsigned long TASK2_PERIOD = 50;     //Buttons Task for left, right, and rotate
+const unsigned long TASK3_PERIOD = 250;    //LCD for score output
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
@@ -566,8 +665,8 @@ task tasks[NUM_TASKS]; // declared task array with 5 tasks
 enum task1_states {task1_start, drop, checkTetris, off, loss} task1_state;
 //  Buttons Left, Right and Rotate State
 enum task2_states {task2_start, idle, left, right, rotate, hold} task2_state;
-
-int varX;
+//  LCD Task States
+enum task3_states {task3_start, update, game, noGame} task3_state;
 
 void TimerISR() {
 	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
@@ -612,26 +711,18 @@ int task1_tick(int state) {
 
           //Collsiuon check
           if(!checkDrop()) {
-            //Have a check if its game over or not
-            if(numTiles <= 1) {
               //Re update output grid to old one
               numTiles--;
               //update output grid
               updateOutput();
               //New state
-              numTiles = 0;
-              state = loss;
-            }
-            //collision and not upoper limit for loss so keep gouing
-            else {
-              //Re update output grid to old one
-              numTiles--;
-              //update output grid
-              updateOutput();
-              //New state
+              //Check if it is  loss
+              if(numTiles <= 3) {
+                gameOver = 1; //game over flag
+              }
               numTiles = 0;
               state = checkTetris;
-            }
+              
           }
 
           //Case for when its at the very last tile
@@ -676,7 +767,14 @@ int task1_tick(int state) {
 
             //rest numLines
             numLines = 0;
+
+
+            //go to loss if game over flag is on
+            if(gameOver == 1) {
+              state = loss;
+            }
           }
+
           break;
         case off:
           state = drop;
@@ -684,14 +782,33 @@ int task1_tick(int state) {
           horPos = 8;
           rot = 0;
 
+          //Set next piece
           next();
           setPiece();
 
           break;
         case loss:
           //Loss state so keep it like that for now
+          if(gameOver == 1) {
+            state = loss;
+          }
+          else {
+            state = drop;
+            //reset everything
+            gameOver = 0;
+            horPos = 0;
+            rot = 0;
+            numLines = 0;
+            score = 0;
+            //Set next piece
+            next();
+            setPiece();
 
-          //Maybe wait 10 seconds or so for thing to reset again to play?
+            for(int i = 0; i < 8; i++) {
+              outGrid[i] = 0x00000000;
+              tetrisGrid[i] = 0;
+            }
+          }
 
           break;
     }
@@ -756,14 +873,39 @@ int task1_tick(int state) {
 
           break;
         case loss:
-          //set game over for loss
-          gameOver = 1;
+          //Output over statement
+          for(int i = 0; i < 8; i++) {
+            //Convert the 32bit binary to 4 8-bit binary
+            x = over[i];   //i + 8 to control where we want to move piecves horizontally
+            b1 = (x & 0xff);
+            b2 = (x >> 8) & 0xff;
+            b3 = (x >> 16) & 0xff;
+            b4 = (x >> 24);
+
+            //send stuff to SPI
+            PORTB = SetBit(PORTB, 2, 0); //set low
+            //matrix 4
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b4);
+            //matrix 3
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b3);
+            //matrix 2
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b2);
+            //matrix 1
+            SPI_SEND(0x01 + i);
+            SPI_SEND(b1);
+            PORTB = SetBit(PORTB, 2, 1); //set high
+          }
+          
           break;
     }
 
     //return satte
     return state;
 }
+
 
 //
 // Button Left, Right and Rotate Tick Function
@@ -847,6 +989,88 @@ int task2_tick(int state) {
 
 
 //
+//  LED Matrix Tick Function
+//
+
+int task3_tick(int state) {
+    //state transitions
+    switch(state) {
+        case task3_start:
+          gameOver = 0;
+          state = update;
+          break;
+        case update:
+          if(gameOver == 0) {
+            state = game;
+          }
+          else {
+            state = noGame;
+            j = 0;  //counter for GAME OVER VAR
+          }
+          break;
+        case game:
+          if(gameOver == 0) {
+            state = game;
+          }
+          else {
+            state = update;
+          }
+          break;
+        case noGame:
+          if(j < 50) {
+            state = noGame;
+          }
+          else {
+            state = update;
+            //reset game over
+            gameOver = 0;
+          }
+          break;
+    }
+
+    //state functions
+    switch(state) {
+        case task3_start:
+          //do nothing
+          break;
+        case update:
+          if(gameOver == 0) {
+            lcd_clear();
+            lcd_goto_xy(0, 0);
+            lcd_write_str("Player Score:   ");
+          }
+          else {
+            lcd_clear();
+            lcd_goto_xy(0, 0);
+            lcd_write_str("Thx 4 Playing");
+            lcd_goto_xy(1, 0);
+            lcd_write_str("Game Over!");
+            //Then Maybe Add a custom character at the end
+          }
+          break;
+        case game:
+          //update the score thats it
+          lcd_goto_xy(1, 0);
+          //output score value
+          convertInt(score, scoreOut);
+          lcd_write_character(scoreOut[0]);
+          lcd_write_character(scoreOut[1]);
+          lcd_write_character(scoreOut[2]);
+          lcd_write_character(scoreOut[3]);
+          lcd_write_str(" Pts");
+          break;
+        case noGame:
+          j++;
+          break;
+          
+    }
+
+    //return satte
+    return state;
+}
+
+
+//
 //  Main Function
 //
 
@@ -854,14 +1078,14 @@ int main(void) {
     //TODO: initialize all your inputs and ouputs
     DDRC = 0x00; PORTC = 0xFF; //all inputs for C
     DDRB = 0xFF; PORTB = 0x00; //all outputs for B
-    //DDRD = 0xFF; PORTD = 0x00; //all outputs for D
+    DDRD = 0xFF; PORTD = 0x00; //all outputs for D
 
     ADC_init();     // initializes ADC
     SPI_INIT();     // Initialize SPI protocol
     Matrix_Init();  // Initialize 8x8 Led matrix
     queue_init();   // Initialize queue with first 4 pieces
     setPiece();     // Set First piece 
-    serial_init (9600);
+    lcd_init();     // Initlize LCD
 
     
     //Task Initialization
@@ -876,6 +1100,12 @@ int main(void) {
     tasks[1].state = task2_start;
     tasks[1].elapsedTime = TASK2_PERIOD;
     tasks[1].TickFct = &task2_tick;
+
+    //LCD Screen task initialization
+    tasks[2].period = TASK3_PERIOD;
+    tasks[2].state = task3_start;
+    tasks[2].elapsedTime = TASK3_PERIOD;
+    tasks[2].TickFct = &task3_tick;
 
     TimerSet(GCD_PERIOD);
     TimerOn();
