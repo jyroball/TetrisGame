@@ -26,7 +26,7 @@
 //Library for random
 #include "stdlib.h"
 
-#define NUM_TASKS 3     //Macro for total number of tasks
+#define NUM_TASKS 4     //Macro for total number of tasks
 
 
 /*
@@ -75,16 +75,48 @@ int randomNum = 0;
 //bool variables to know if game over or not
 bool gameOver = 0;
 
-//Counter Variable
-int j = 0;
-
 /*
         Passive Buzzer Functions and whatnot
 */
 
+//Chords ICR1 Values (Short num of chords for now, wanna add more later if have time)
+int C = 7644;
+int D = 6812;
+int E = 6067;
+int F = 5718;
+int G = 5103;
+int A = 4545;
+int B = 4044;
+
+const int size = 130;
+
+//array to play music (Melody of Little Root Town Pokemon)
+int chords[size] = {
+  F, F, G, G,
+  A, A, A*2, A*2, C, C, G, G,
+  A, A, G, G, A, A, B, B, 
+  0, 0, C, C, 0, 0, D, 0,
+  A, A, G, G, A, A, C, C,
+  D, D, 0, 0, E, E, 0, 0,
+  D, D, 0, 0, A, A, G, G,
+  F, F, E, E, F, F, A, A,
+  0, 0, 0, 0, D, D, E, E,
+  F, F, A*2, A*2, B, B, D, D,
+  C, C, B, B, 0, B, A, A,
+  F, F, A*2, A*2, B, B, D, D,
+  D, D, B, B, A, A, G, G,
+  F, 0, 0, 0, 0, 0, 0, 0, 
+  F, F, D, D, F, F, E, E, 
+  0, 0, 0, F, 0, 0, G, G,
+  0, 0, C, C, B, B
+};
+
+//Counter Variables
+int j = 0;
+int u = 0;
 
 
-
+//Wanna add more music and sound effects if i had more time
 
 
 /*
@@ -658,6 +690,7 @@ const unsigned long GCD_PERIOD = 50;       //GCD Period for tasks
 const unsigned long TASK1_PERIOD = 250;    //LED Matrix
 const unsigned long TASK2_PERIOD = 50;     //Buttons Task for left, right, and rotate
 const unsigned long TASK3_PERIOD = 250;    //LCD for score output
+const unsigned long TASK4_PERIOD = 250;    //Passive Buzzer to play a score/melody
 
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
@@ -667,6 +700,8 @@ enum task1_states {task1_start, drop, checkTetris, off, loss} task1_state;
 enum task2_states {task2_start, idle, left, right, rotate, hold} task2_state;
 //  LCD Task States
 enum task3_states {task3_start, update, game, noGame} task3_state;
+//  Passive Buzzer Task to play some music :)
+enum task4_states {task4_start, playSong, pressMute, muteSong, pressPlay} task4_state;
 
 void TimerISR() {
 	for ( unsigned int i = 0; i < NUM_TASKS; i++ ) {           // Iterate through each task in the task array
@@ -1070,6 +1105,103 @@ int task3_tick(int state) {
 }
 
 
+
+//
+//  Passive Buzzer Tick Function
+//
+
+//Passive BUZZER Tick function
+int task4_tick(int state) {
+    //state transitions
+    switch(state) {
+        case task4_start:
+          state = playSong;
+          u = 0;
+          break;
+        case playSong:
+          //Mute Button
+          if(!((PINC>>1) & 0x01)) {
+            state = playSong;
+          }
+          else {
+            state = pressMute;
+          }
+          break;
+        case pressMute:
+          //Mute Button
+          if(!((PINC>>1) & 0x01)) {
+            state = muteSong;
+          }
+          else {
+            state = pressMute;
+          }
+          break;
+        case muteSong:
+          //Mute Button
+          if(!((PINC>>1) & 0x01)) {
+            state = muteSong;
+          }
+          else {
+            state = pressPlay;
+          }
+          break;
+        case pressPlay:
+          //Mute Button
+          if(!((PINC>>1) & 0x01)) {
+            state = playSong;
+          }
+          else {
+            state = pressPlay;
+          }
+          break;
+    }
+
+    //state functions
+    switch(state) {
+        case task4_start:
+          //ignore do nothing
+          break;
+        case playSong:
+          //play song
+          TCCR1A |= (1 << WGM11) | (1 << COM1A1); //COM1A1 sets it to channel A
+          TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11); //CS11 sets the prescaler to be 8
+          //WGM11, WGM12, WGM13 set timer to fast pwm mode
+
+          ICR1 = chords[u]; //pwm period depending on the chord frequency
+
+          OCR1A = chords[u] / 10;
+
+          //increment i
+          if(u < size) {
+            u++;
+          }
+          else {
+            u = 0;
+          }
+          break;
+        case pressMute:
+          //Do Nothing
+          break;
+        case muteSong:
+          //Mute Song Dont play Anything
+          //play song
+          TCCR1A |= (1 << WGM11) | (1 << COM1A1); //COM1A1 sets it to channel A
+          TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11); //CS11 sets the prescaler to be 8
+          //WGM11, WGM12, WGM13 set timer to fast pwm mode
+
+          ICR1 = 0; //pwm period depending on the chord frequency
+
+          OCR1A = 0;
+          break;
+        case pressPlay:
+          //do nothing transition phase
+          break;
+    }
+
+    //return satte
+    return state;
+}
+
 //
 //  Main Function
 //
@@ -1086,7 +1218,6 @@ int main(void) {
     queue_init();   // Initialize queue with first 4 pieces
     setPiece();     // Set First piece 
     lcd_init();     // Initlize LCD
-
     
     //Task Initialization
     //LED Matrix task initialization
@@ -1106,6 +1237,12 @@ int main(void) {
     tasks[2].state = task3_start;
     tasks[2].elapsedTime = TASK3_PERIOD;
     tasks[2].TickFct = &task3_tick;
+    
+    //Passive Buzzer Task Initialization
+    tasks[3].period = TASK4_PERIOD;
+    tasks[3].state = task4_start;
+    tasks[3].elapsedTime = TASK4_PERIOD;
+    tasks[3].TickFct = &task4_tick;
 
     TimerSet(GCD_PERIOD);
     TimerOn();
