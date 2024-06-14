@@ -10,6 +10,12 @@
 //Variable for pseudo random number
 int randomNum = 0;
 
+//Variable for Score
+int score = 0;
+
+//bool variables to know if game over or not
+bool gameOver = 0;
+
 //TOOK OUT PASSIVE BUZZER CODE FOR NOW TO TEST TETRIS BOARD
 
 /*
@@ -249,7 +255,7 @@ unsigned long LPiece[numPos][columns] = {
   {0x00000000, 
   0x00000000, 
   0x00000000, 
-  0x00000002, 
+  0x00000004, 
   0x0000001C, 
   0x00000000, 
   0x00000000, 
@@ -331,10 +337,10 @@ int rot = 0;
 //Initialize queue
 void queue_init() {
   //Push first 4 shapes for now
-  nextPCS.push(4);
-  nextPCS.push(1);
-  nextPCS.push(2);
   nextPCS.push(3);
+  nextPCS.push(4);
+  nextPCS.push(2);
+  nextPCS.push(0);
 }
 
 void next() {
@@ -481,6 +487,7 @@ void setPiece() {
     }
 }
 
+
 //
 //  Functions for piece placement validations
 //
@@ -498,10 +505,22 @@ bool checkDrop() {
   return true;  //No colliusion
 }
 
-//rotating validation (rot + rotMul) % numRot then keep changing rotMul
-bool checkRotate() {
+//line check variables
+int numLines = 0;
 
+//Line Check Functions
+bool checkLine() {
+  //loop through all of columns and place pieces into it
+  for(int i = 0; i < 8; i++) {
+    if((outGrid[i] & 0x80000000) != 0x80000000) {
+      return false;  //No line made
+    }
+  }
+
+  //Line made cause got here
+  return true;
 }
+
 
 //
 //  Output Grid and Tetris Grid Update functions
@@ -524,7 +543,6 @@ void updateTetris() {
 }
 
 
-
 //
 //  Task Functions
 //
@@ -545,9 +563,9 @@ const unsigned long TASK2_PERIOD = 50;     //JoyStick
 task tasks[NUM_TASKS]; // declared task array with 5 tasks
 
 //  LED Matrix States
-enum task1_states {task1_start, drop, checkTetris, off} task1_state;
-//  Joystick Left and Right State
-enum task2_states {task2_start, idle, left, right, hold} task2_state;
+enum task1_states {task1_start, drop, checkTetris, off, loss} task1_state;
+//  Buttons Left, Right and Rotate State
+enum task2_states {task2_start, idle, left, right, rotate, hold} task2_state;
 
 int varX;
 
@@ -592,19 +610,28 @@ int task1_tick(int state) {
           //update output grid
           updateOutput();
 
-
-          //have rotation check and fast drop with joystick here
-
-
           //Collsiuon check
           if(!checkDrop()) {
-            //Re update output grid to old one
+            //Have a check if its game over or not
+            if(numTiles <= 1) {
+              //Re update output grid to old one
+              numTiles--;
+              //update output grid
+              updateOutput();
+              //New state
+              numTiles = 0;
+              state = loss;
+            }
+            //collision and not upoper limit for loss so keep gouing
+            else {
+              //Re update output grid to old one
               numTiles--;
               //update output grid
               updateOutput();
               //New state
               numTiles = 0;
               state = checkTetris;
+            }
           }
 
           //Case for when its at the very last tile
@@ -622,16 +649,34 @@ int task1_tick(int state) {
           numTiles++;
           state = checkTetris;
 
-          
           //Update Tetris
-          if(numTiles >= 20) {
+          if(numTiles >= 4) {
             //Change tetris board with new pieces
             updateTetris();
-
             numTiles = 0;
             state = off;
-          }
 
+            //get score for person
+            //just one line so no multiplier
+            if(numLines == 1) {
+              score++;
+            }
+            // 2 lines so 2x the score
+            if(numLines == 2) {
+              score += 2;
+            }
+            // 3 lines so 5 times the score
+            if(numLines == 3) {
+              score += 5;
+            }
+            // 4 lines so 8 times the score
+            if(numLines == 4) {
+              score += 8;
+            }
+
+            //rest numLines
+            numLines = 0;
+          }
           break;
         case off:
           state = drop;
@@ -641,6 +686,12 @@ int task1_tick(int state) {
 
           next();
           setPiece();
+
+          break;
+        case loss:
+          //Loss state so keep it like that for now
+
+          //Maybe wait 10 seconds or so for thing to reset again to play?
 
           break;
     }
@@ -679,13 +730,15 @@ int task1_tick(int state) {
           
           break;
         case checkTetris:
-          //do nothing For now
-          
           //Have a check if they get tetris or get a row
-            //loop through all of Tetris or output grid
-            //then outgrid[i] & 0x00000001 == 0x00000001 for one row then check again and keep looping till not there
-
-
+          if(checkLine()) {
+            //increment number of lines got for score
+            numLines++;
+            for(int i = 0; i < 8; i++) {
+              outGrid[i] = outGrid[i] << 1;
+            }
+          }
+          
           break;
         case off:
           for(int i = 0; i < 8; i++) {
@@ -702,6 +755,10 @@ int task1_tick(int state) {
           }
 
           break;
+        case loss:
+          //set game over for loss
+          gameOver = 1;
+          break;
     }
 
     //return satte
@@ -709,8 +766,9 @@ int task1_tick(int state) {
 }
 
 //
-// Left and Right Tick Function
+// Button Left, Right and Rotate Tick Function
 //
+
 int task2_tick(int state) {
     //state transitions
     switch(state) {
@@ -719,7 +777,7 @@ int task2_tick(int state) {
           break;
         case idle:
           //stay off if no input is done
-            if(!((PINC>>3) & 0x01) && !((PINC>>4) & 0x01)) {
+            if(!((PINC>>3) & 0x01) && !((PINC>>4) & 0x01) && !((PINC>>2) & 0x01)) {
                 state = idle;
             }
             //left button is turned on but reight not
@@ -729,6 +787,10 @@ int task2_tick(int state) {
             //right button is turned on but left not
             else if(((PINC>>4) & 0x01)) {
                 state = right;
+            }
+            //Rotate Button
+            else if(((PINC>>2) & 0x01)) {
+              state = rotate;
             }
             //stay in off just in case
             else {
@@ -741,9 +803,12 @@ int task2_tick(int state) {
         case right:
           state = hold;
           break;
+        case  rotate:
+          state = hold;
+          break;
         case hold:
           //stay in hold while holdinhg
-          if(((PINC>>3) & 0x01) || ((PINC>>4) & 0x01)) {
+          if(((PINC>>3) & 0x01) || ((PINC>>4) & 0x01) || ((PINC>>2) & 0x01)) {
             state = hold;
           }
           //go back to off when not pressing anymore
@@ -766,6 +831,10 @@ int task2_tick(int state) {
           break;
         case right:
           if(horPos > maxHorRight) horPos--;
+          break;
+        case rotate:
+          rot = (rot + 1) % 4;
+          setPiece();
           break;
         case hold:
           //do nothjing
