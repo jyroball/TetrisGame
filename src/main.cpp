@@ -16,6 +16,11 @@
 
 */
 
+
+/*
+        LIBRARIES USED
+*/
+
 //Utility Libraries
 #include "timerISR.h"     //Timer ISR
 #include "helper.h"       //For Bit access functions
@@ -26,6 +31,9 @@
 //Library for random
 #include "stdlib.h"
 
+
+
+//TOTAL NUMBER OF TASKS for task scheduler
 #define NUM_TASKS 4     //Macro for total number of tasks
 
 
