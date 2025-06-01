@@ -1,2 +1,2 @@
 # Tetris_Game
- Hardware Tetris game iported into an Arduino UNO chip
+ Hardware Tetris game imported into an Arduino UNO chip
